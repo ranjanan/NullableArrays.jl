@@ -17,7 +17,7 @@ designated by `I` is present, then it will be returned wrapped in a
 `Nullable{T}()`.
 """
 # Extract a scalar element from a `NullableArray`.
-@inline function Base.getindex{T, N}(X::NullableArray{T, N}, I::Int...)
+Base.@propagate_inbounds @inline function Base.getindex{T, N}(X::NullableArray{T, N}, I::Int...)
     if isbits(T)
         ifelse(X.isnull[I...], Nullable{T}(), Nullable{T}(X.values[I...]))
     else
@@ -35,7 +35,7 @@ end
 Just as above, with the additional behavior that this method throws an error if
 any component of the index `I` is null.
 """
-@inline function Base.getindex{T, N}(X::NullableArray{T, N},
+Base.@propagate_inbounds @inline function Base.getindex{T, N}(X::NullableArray{T, N},
                                      I::Nullable{Int}...)
     anynull(I) && throw(NullException())
     values = [ get(i) for i in I ]
@@ -52,7 +52,7 @@ that the entry at index `I` is present and `X.values` is updated to store the
 value wrapped in `v`.
 """
 # Insert a scalar element from a `NullableArray` from a `Nullable` value.
-@inline function Base.setindex!(X::NullableArray, v::Nullable, I::Int...)
+Base.@propagate_inbounds @inline function Base.setindex!(X::NullableArray, v::Nullable, I::Int...)
     if isnull(v)
         X.isnull[I...] = true
     else
@@ -70,31 +70,19 @@ Set the entry of `X` at position `I` equal to `v`. This method always updates
 to store `v` at `I`.
 """
 # Insert a scalar element from a `NullableArray` from a non-Nullable value.
-@inline function Base.setindex!(X::NullableArray, v::Any, I::Int...)
+Base.@propagate_inbounds @inline function Base.setindex!(X::NullableArray, v::Any, I::Int...)
     X.values[I...] = v
     X.isnull[I...] = false
     return v
 end
 
-# test if the value X[i] is null without checking the `I` index validity
-unsafe_isnull(X::NullableArray, I::Int...) = Base.unsafe_getindex(X.isnull, I...)
-unsafe_isnull{T}(X::AbstractNullableArray{T}, I::Int...) = isnull(Base.unsafe_getindex(X, I...))
+# return non-null element of X
+Base.@propagate_inbounds @inline unsafe_getvalue_notnull(X::NullableArray, I::Int...) = X.values[I...]
+Base.@propagate_inbounds @inline unsafe_getvalue_notnull{T}(X::AbstractNullableArray{T}, I::Int...) = get(X[I...])
 
 # returns non-null element of X wrapped in Nullable
-function unsafe_getindex_notnull(X::NullableArray, I::Int...)
-    return Nullable(Base.unsafe_getindex(X.values, I...))
-end
-function unsafe_getindex_notnull{T}(X::AbstractNullableArray{T}, I::Int...)
-    return Base.unsafe_getindex(X, I...)
-end
-
-# return non-null element of X
-function unsafe_getvalue_notnull(X::NullableArray, I::Int...)
-    return Base.unsafe_getindex(X.values, I...)
-end
-function unsafe_getvalue_notnull{T}(X::AbstractNullableArray{T}, I::Int...)
-    return get(Base.unsafe_getindex(X, I...))
-end
+Base.@propagate_inbounds @inline unsafe_getindex_notnull{T}(X::AbstractNullableArray{T}, I::Int...) =
+    Nullable{T}(unsafe_getvalue_notnull(X, I...))
 
 if VERSION >= v"0.5.0-dev+4697"
     function Base.checkindex(::Type{Bool}, inds::AbstractUnitRange, i::Nullable)
@@ -146,6 +134,6 @@ end
 
 This is a convenience method to set the entry of `X` at index `I` to be null
 """
-function nullify!(X::NullableArray, I...)
+Base.@propagate_inbounds function nullify!(X::NullableArray, I...)
     setindex!(X, Nullable{eltype(X)}(), I...)
 end
