@@ -109,14 +109,14 @@ else
      end
 
     function Base.checkbounds(::Type{Bool}, sz::Int, I::NullableVector{Bool})
-         anynull(I) && throw(NullException())
+        anynull(I) && throw(NullException())
         length(I) == sz
-     end
+    end
 
     function Base.checkbounds{T<:Real}(::Type{Bool}, sz::Int, I::NullableArray{T})
         inbounds = true
-         anynull(I) && throw(NullException())
-         for i in 1:length(I)
+        anynull(I) && throw(NullException())
+        for i in 1:length(I)
              @inbounds v = unsafe_getvalue_notnull(I, i)
             inbounds &= checkbounds(Bool, sz, v)
          end
